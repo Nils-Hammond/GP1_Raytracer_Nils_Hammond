@@ -52,14 +52,14 @@ int main(int argc, char* args[])
 	const auto pTimer = new Timer();
 	const auto pRenderer = new Renderer(pWindow);
 
-	const auto pScene = new Scene_W1();
+	const auto pScene = new Scene_W2();
 	pScene->Initialize();
 
 	//Start loop
 	pTimer->Start();
 
 	// Start Benchmark
-	// pTimer->StartBenchmark();
+	//pTimer->StartBenchmark();
 
 	float printTimer = 0.f;
 	bool isLooping = true;

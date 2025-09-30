@@ -176,4 +176,13 @@ namespace dae
 		unsigned char materialIndex{ 0 };
 	};
 #pragma endregion
+#pragma region BVH
+	struct BVHNode final
+	{
+		Vector3 aabbMin{};
+		Vector3 aabbMax{};
+		uint8_t leftNode, firstPrimIdx, primCount;
+		bool isLeaf() const { return primCount > 0; }
+	};
+#pragma endregion
 }

@@ -1,6 +1,8 @@
+#include <algorithm>
 #include "Scene.h"
 #include "Utils.h"
 #include "Material.h"
+#include <iostream>
 
 namespace dae {
 
@@ -54,9 +56,149 @@ namespace dae {
 	bool Scene::DoesHit(const Ray& ray) const
 	{
 		//todo W2
-		throw std::runtime_error("Not Implemented Yet");
+		const std::vector<Sphere>& spheres = GetSphereGeometries();
+		const std::vector<Plane>& planes = GetPlaneGeometries();
+		HitRecord tempHit{};
+
+		if (IntersectSphereBVH(ray, tempHit, rootNodeIdx, true))
+			return true;
+
+		//for (const Sphere& sphere : spheres)
+		//{
+		//	if (GeometryUtils::HitTest_Sphere(sphere, ray, tempHit, true))
+		//	{
+		//		return true;
+		//	}
+		//}
+		for (const Plane& plane : planes)
+		{
+			if (GeometryUtils::HitTest_Plane(plane, ray, tempHit, true))
+			{
+				return true;
+			}
+		}
 		return false;
 	}
+
+#pragma region BVH Helpers
+	void Scene::BuildSphereBVH()
+	{
+		nodesUsed = 1;
+		m_SphereIndices.clear();
+		m_SphereBVHNode.clear();
+		const int numSpheres = static_cast<const int>(m_SphereGeometries.size());
+
+		for (int i = 0; i < numSpheres; ++i)
+		{
+			m_SphereIndices.emplace_back(i);
+		}
+		for (int i = 0; i < numSpheres * 2 - 1; ++i)
+		{
+			m_SphereBVHNode.emplace_back();
+		}
+		BVHNode& root = m_SphereBVHNode[rootNodeIdx];
+		root.leftNode = 0;
+		root.firstPrimIdx = 0;
+		root.primCount = numSpheres;
+
+		UpdateNodeBounds(rootNodeIdx);
+
+		Subdivide(rootNodeIdx);
+	}
+
+	void Scene::UpdateNodeBounds(int nodeIdx)
+	{
+		BVHNode& node = m_SphereBVHNode[nodeIdx];
+		node.aabbMin = Vector3(FLT_MAX, FLT_MAX, FLT_MAX);
+		node.aabbMax = Vector3(FLT_MIN, FLT_MIN, FLT_MIN);
+
+		for (uint8_t first = node.firstPrimIdx, i = 0; i < node.primCount; i++)
+		{
+			uint8_t leafSphereIdx = m_SphereIndices[first + i];
+			Sphere& leafSphere = m_SphereGeometries[leafSphereIdx];
+
+			Vector3 sphereMin = leafSphere.origin - Vector3(leafSphere.radius, leafSphere.radius, leafSphere.radius);
+			Vector3 sphereMax = leafSphere.origin + Vector3(leafSphere.radius, leafSphere.radius, leafSphere.radius);
+
+			node.aabbMin.x = std::min(node.aabbMin.x, sphereMin.x);
+			node.aabbMin.y = std::min(node.aabbMin.y, sphereMin.y);
+			node.aabbMin.z = std::min(node.aabbMin.z, sphereMin.z);
+			node.aabbMax.x = std::max(node.aabbMax.x, sphereMax.x);
+			node.aabbMax.y = std::max(node.aabbMax.y, sphereMax.y);
+			node.aabbMax.z = std::max(node.aabbMax.z, sphereMax.z);
+		}
+	}
+
+	void Scene::Subdivide(int nodeIdx)
+	{
+		// terminate recursion
+		BVHNode& node = m_SphereBVHNode[nodeIdx];
+		if (node.primCount <= 2) return;
+
+		// determine split axis and position
+		Vector3 extent = node.aabbMax - node.aabbMin;
+		int axis = 0;
+		if (extent.y > extent.x) axis = 1;
+		if (extent.z > extent[axis]) axis = 2;
+		float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
+
+		// in-place partition
+		int i = node.firstPrimIdx;
+		int j = i + node.primCount - 1;
+		while (i <= j)
+		{
+			if (m_SphereGeometries[m_SphereIndices[i]].origin[axis] < splitPos)
+				i++;
+			else
+				std::swap(m_SphereIndices[i], m_SphereIndices[j--]);
+		}
+
+		// abort split if one of the sides is empty
+		int leftCount = i - node.firstPrimIdx;
+		if (leftCount == 0 || leftCount == node.primCount) return;
+
+		// create child nodes
+		int leftChildIdx = nodesUsed++;
+		int rightChildIdx = nodesUsed++;
+		m_SphereBVHNode[leftChildIdx].firstPrimIdx = node.firstPrimIdx;
+		m_SphereBVHNode[leftChildIdx].primCount = leftCount;
+		m_SphereBVHNode[rightChildIdx].firstPrimIdx = i;
+		m_SphereBVHNode[rightChildIdx].primCount = node.primCount - leftCount;
+		node.leftNode = leftChildIdx;
+		node.primCount = 0;
+		UpdateNodeBounds(leftChildIdx);
+		UpdateNodeBounds(rightChildIdx);
+
+		// recurse
+		Subdivide(leftChildIdx);
+		Subdivide(rightChildIdx);
+	}
+
+	bool Scene::IntersectSphereBVH(const Ray& ray, HitRecord& closestHit, const int nodeIdx, bool ignoreHitRecord) const
+	{
+		const BVHNode& node = m_SphereBVHNode[nodeIdx];
+		bool hit = false;
+		if (!GeometryUtils::IntersectAABB(node.aabbMin, node.aabbMax, ray)) return false;
+		if (node.isLeaf())
+		{
+			for (uint8_t i = 0; i < node.primCount; i++)
+			{
+				if (GeometryUtils::HitTest_Sphere(m_SphereGeometries[m_SphereIndices[node.firstPrimIdx + i]], ray, closestHit, ignoreHitRecord))
+				{
+					hit = true;
+				}
+			}
+		}
+		else
+		{
+			if (IntersectSphereBVH(ray, closestHit, node.leftNode, ignoreHitRecord))
+				hit = true;
+			if (IntersectSphereBVH(ray, closestHit, node.leftNode + 1, ignoreHitRecord))
+				hit = true;
+		}
+		return hit;
+	}
+#pragma endregion
 
 #pragma region Scene Helpers
 	Sphere* Scene::AddSphere(const Vector3& origin, float radius, unsigned char materialIndex)
@@ -158,4 +300,57 @@ namespace dae {
 		}
 	}
 #pragma endregion
+
+#pragma region SCENE W2
+	void Scene_W2::Initialize()
+	{
+		//m_Camera.forward = { 0.266f, -0.453f, .860f };
+		m_Camera.origin = { 0.f, 3.f, -9.f };
+		m_Camera.fovAngle = 45.f;
+
+		constexpr unsigned char matId_Solid_Red = 0;
+		const unsigned char matId_Solid_Blue = AddMaterial(new Material_SolidColor{ colors::Blue });
+
+		const unsigned char matId_Solid_Yellow = AddMaterial(new Material_SolidColor{ colors::Yellow });
+		const unsigned char matId_Solid_Green = AddMaterial(new Material_SolidColor{ colors::Green });
+		const unsigned char matId_Solid_Magenta = AddMaterial(new Material_SolidColor{ colors::Magenta });
+
+		//Spheres
+		AddSphere({ -1.75f, 1.f, 00.f }, .75f, matId_Solid_Red);
+		AddSphere({ 0.f, 1.f, 0.f }, .75f, matId_Solid_Blue);
+		AddSphere({ 1.75f, 1.f, 0.f }, .75f, matId_Solid_Red);
+		AddSphere({ -1.75f, 3.f, 0.f }, .75f, matId_Solid_Blue);
+		AddSphere({ 0.f, 3.f, 0.f }, .75f, matId_Solid_Red);
+		AddSphere({ 1.75f, 3.f, 0.f }, .75f, matId_Solid_Blue);
+
+
+		//Plane
+		AddPlane({ -5.f, 0.f, 0.f }, { 1.f, 0.f,0.f }, matId_Solid_Green);
+		AddPlane({ 5.f, 0.f, 0.f }, { -1.f, 0.f,0.f }, matId_Solid_Green);
+		AddPlane({ 0.f, 0.f, 0.f }, { 0.f, 1.f,0.f }, matId_Solid_Yellow);
+		AddPlane({ 0.f, 10.f, 0.f }, { 0.f, -1.f,0.f }, matId_Solid_Yellow);
+		AddPlane({ 0.f, 0.f, 10.f }, { 0.f, 0.f,-1.f }, matId_Solid_Magenta);
+
+		AddPointLight({ 0.f, 5.f, -5.f }, 70.f, colors::White);
+
+		BuildSphereBVH();
+	}
+	void Scene_W2::Update(dae::Timer* pTimer)
+	{
+		static int counter = 0;
+		++counter;
+		Scene::Update(pTimer);
+		BuildSphereBVH();
+		for (Sphere& sphere : m_SphereGeometries)
+		{
+			sphere.origin.y += sinf(pTimer->GetTotal()) * 0.1f;
+			sphere.origin.x += cosf(pTimer->GetTotal()) * 0.1f;
+		}
+		//todo W2
+		//std::cout << counter << std::endl;
+		if (counter > 2)
+		{
+			//throw std::runtime_error("That's enough frames");
+		}
+	}
 }

@@ -23,29 +23,33 @@ namespace dae
 
 			float thc = sqrt(r2 - od2);
 			
-			if (!ignoreHitRecord)
+			float t0 = tca - thc;
+			if (t0 > ray.min && t0 < ray.max && t0 < hitRecord.t)
 			{
-				float t0 = tca - thc;
-				hitRecord.didHit = true;
-				hitRecord.materialIndex = sphere.materialIndex;
-				if (t0 > ray.min && t0 < ray.max && t0 < hitRecord.t)
+				if (!ignoreHitRecord)
 				{
+					hitRecord.didHit = true;
+					hitRecord.materialIndex = sphere.materialIndex;
 					hitRecord.t = t0;
 					hitRecord.origin = ray.origin + ray.direction * t0;
 					hitRecord.normal = (hitRecord.origin - sphere.origin).Normalized();
-					return true;
 				}
-
-				float t1 = tca + thc;
-				if (t1 > ray.min && t1 < ray.max && t1 < hitRecord.t)
+				return true;
+			}
+			float t1 = tca + thc;
+			if (t1 > ray.min && t1 < ray.max && t1 < hitRecord.t)
+			{
+				if (!ignoreHitRecord)
 				{
+					hitRecord.didHit = true;
+					hitRecord.materialIndex = sphere.materialIndex;
 					hitRecord.t = t1;
 					hitRecord.origin = ray.origin + ray.direction * t1;
 					hitRecord.normal = (hitRecord.origin - sphere.origin).Normalized();
-					return true;
 				}
+				return true;
 			}
-			return true;
+			return false;
 		}
 
 		inline bool HitTest_Sphere(const Sphere& sphere, const Ray& ray)
@@ -110,6 +114,18 @@ namespace dae
 			return HitTest_TriangleMesh(mesh, ray, temp, true);
 		}
 #pragma endregion
+#pragma region BoundingBox Intersect
+		inline bool IntersectAABB(const Vector3& bmin, const Vector3& bmax, const Ray& ray)
+		{
+			float tx1 = (bmin.x - ray.origin.x) / ray.direction.x, tx2 = (bmax.x - ray.origin.x) / ray.direction.x;
+			float tmin = std::min(tx1, tx2), tmax = std::max(tx1, tx2);
+			float ty1 = (bmin.y - ray.origin.y) / ray.direction.y, ty2 = (bmax.y - ray.origin.y) / ray.direction.y;
+			tmin = std::max(tmin, std::min(ty1, ty2)), tmax = std::min(tmax, std::max(ty1, ty2));
+			float tz1 = (bmin.z - ray.origin.z) / ray.direction.z, tz2 = (bmax.z - ray.origin.z) / ray.direction.z;
+			tmin = std::max(tmin, std::min(tz1, tz2)), tmax = std::min(tmax, std::max(tz1, tz2));
+			return tmax >= std::max(tmin, ray.min) && tmin <= ray.max;
+		}
+#pragma endregion
 	}
 
 	namespace LightUtils
@@ -117,9 +133,16 @@ namespace dae
 		//Direction from target to light
 		inline Vector3 GetDirectionToLight(const Light& light, const Vector3 origin)
 		{
-			//todo W3
-			throw std::runtime_error("Not Implemented Yet");
-			return {};
+			Vector3 direction;
+			if (light.type == LightType::Point)
+			{
+				direction = (light.origin - origin);
+			}
+			else if (light.type == LightType::Directional)
+			{
+				direction = -light.direction * FLT_MAX;
+			}
+			return direction;
 		}
 
 		inline ColorRGB GetRadiance(const Light& light, const Vector3& target)

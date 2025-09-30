@@ -59,6 +59,16 @@ namespace dae
 		Light* AddPointLight(const Vector3& origin, float intensity, const ColorRGB& color);
 		Light* AddDirectionalLight(const Vector3& direction, float intensity, const ColorRGB& color);
 		unsigned char AddMaterial(Material* pMaterial);
+
+		std::vector<BVHNode> m_SphereBVHNode{};
+		uint8_t rootNodeIdx{};
+		uint8_t nodesUsed{ 1 };
+		std::vector<uint8_t> m_SphereIndices{};
+
+		void BuildSphereBVH();
+		void UpdateNodeBounds(int nodeIdx);
+		void Subdivide(int nodeIdx);
+		bool IntersectSphereBVH(const Ray& ray, HitRecord& closestHit, const int nodeIdx, bool ignoreHitRecord = false) const;
 	};
 
 	//+++++++++++++++++++++++++++++++++++++++++
@@ -68,7 +78,7 @@ namespace dae
 	public:
 		Scene_W1() = default;
 		~Scene_W1() override = default;
-		
+
 		void Update(dae::Timer* pTimer);
 
 		Scene_W1(const Scene_W1&) = delete;
@@ -80,4 +90,20 @@ namespace dae
 	private:
 		Sphere* m_pSphere1{};
 	};
-}
+
+	class Scene_W2 final : public Scene
+	{
+	public:
+		Scene_W2() = default;
+		~Scene_W2() override = default;
+
+		void Update(dae::Timer* pTimer) override;
+
+		Scene_W2(const Scene_W2&) = delete;
+		Scene_W2(Scene_W2&&) noexcept = delete;
+		Scene_W2& operator=(const Scene_W2&) = delete;
+		Scene_W2& operator=(Scene_W2&&) noexcept = delete;
+
+		void Initialize() override;
+	};
+};
