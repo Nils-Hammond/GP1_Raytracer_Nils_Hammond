@@ -35,14 +35,16 @@ namespace dae {
 		float closestT = FLT_MAX;
 		HitRecord tempHit{};
 
-		for (const Sphere& sphere : spheres)
-		{
-			if (GeometryUtils::HitTest_Sphere(sphere, ray, tempHit) && tempHit.t < closestT)
-			{
-				closestT = tempHit.t;
-				closestHit = tempHit;
-			}
-		}
+		//for (const Sphere& sphere : spheres)
+		//{
+		//	if (GeometryUtils::HitTest_Sphere(sphere, ray, tempHit) && tempHit.t < closestT)
+		//	{
+		//		closestT = tempHit.t;
+		//		closestHit = tempHit;
+		//	}
+		//}
+		IntersectSphereBVH(ray, closestHit, rootNodeIdx, false);
+		closestT = closestHit.t;
 		for (const Plane& plane : planes)
 		{
 			if (GeometryUtils::HitTest_Plane(plane, ray, tempHit) && tempHit.t < closestT)
@@ -178,14 +180,21 @@ namespace dae {
 	{
 		const BVHNode& node = m_SphereBVHNode[nodeIdx];
 		bool hit = false;
+
 		if (!GeometryUtils::IntersectAABB(node.aabbMin, node.aabbMax, ray)) return false;
+
 		if (node.isLeaf())
 		{
 			for (uint8_t i = 0; i < node.primCount; i++)
 			{
-				if (GeometryUtils::HitTest_Sphere(m_SphereGeometries[m_SphereIndices[node.firstPrimIdx + i]], ray, closestHit, ignoreHitRecord))
+				HitRecord tempHit{};
+				if (GeometryUtils::HitTest_Sphere(m_SphereGeometries[m_SphereIndices[node.firstPrimIdx + i]], ray, tempHit, ignoreHitRecord))
 				{
 					hit = true;
+					if (!ignoreHitRecord && tempHit.t < closestHit.t)
+					{
+						closestHit = tempHit;
+					}
 				}
 			}
 		}
