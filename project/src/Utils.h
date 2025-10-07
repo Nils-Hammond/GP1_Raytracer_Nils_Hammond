@@ -148,7 +148,6 @@ namespace dae
 		inline ColorRGB GetRadiance(const Light& light, const Vector3& target)
 		{
 			//todo W3
-			throw std::runtime_error("Not Implemented Yet");
 			if (light.type == LightType::Point)
 			{
 				float distanceSqr = (light.origin - target).SqrMagnitude();

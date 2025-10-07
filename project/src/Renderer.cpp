@@ -41,10 +41,7 @@ void Renderer::Render(Scene* pScene) const
 		{
 			int px = idx % m_Width;
 			int py = idx / m_Width;
-			//for (int px{}; px < m_Width; ++px)
-			//{
-			//	for (int py{}; py < m_Height; ++py)
-			//	{
+
 			float ndcx = (2 * (px + 0.5f) / m_Width - 1) * aspectRatio * fov;
 			float ndcy = (1 - 2 * (py + 0.5f) / m_Height) * fov;
 			Vector3 rayDirection = Vector3{ ndcx, ndcy, 1 }.Normalized();
@@ -60,14 +57,40 @@ void Renderer::Render(Scene* pScene) const
 
 			if (closestHit.didHit)
 			{
-				Vector3 lightDir = LightUtils::GetDirectionToLight(lights[0], closestHit.origin);
-				Ray shadowRay{ closestHit.origin, lightDir.Normalized(), 0.0001f, lightDir.Magnitude() };
+				//Vector3 lightDir = LightUtils::GetDirectionToLight(lights[0], closestHit.origin);
 
-				finalColor = materials[closestHit.materialIndex]->Shade();
-
-				if (pScene->DoesHit(shadowRay))
+				for (const Light& light : lights)
 				{
-					finalColor *= 0.5f;
+					Vector3 lightDir = LightUtils::GetDirectionToLight(light, closestHit.origin);
+
+					//Shadow
+					if (m_ShadowsEnabled)
+					{
+						Ray shadowRay{ closestHit.origin, lightDir.Normalized(), 0.0001f, lightDir.Magnitude() };
+						if (pScene->DoesHit(shadowRay))
+						{
+							continue;
+						}
+					}
+
+					//Observed Area Measure
+					float lambert = Vector3::Dot(closestHit.normal, lightDir.Normalized());
+					if (lambert < 0) continue;
+
+					//Radiance
+					ColorRGB radiance = LightUtils::GetRadiance(light, closestHit.origin);
+
+					//BRDF
+					ColorRGB brdf = materials[closestHit.materialIndex]->Shade(closestHit, -hitRay.direction, lightDir.Normalized());
+
+					if (m_LightingMode == LightingMode::Combined)
+						finalColor += lambert * radiance * brdf;
+					else if (m_LightingMode == LightingMode::ObservedArea)
+						finalColor += ColorRGB{ lambert, lambert, lambert };
+					else if (m_LightingMode == LightingMode::Radiance)
+						finalColor += radiance;
+					else if (m_LightingMode == LightingMode::BRDF)
+						finalColor += brdf;
 				}
 			}
 
@@ -89,4 +112,9 @@ void Renderer::Render(Scene* pScene) const
 bool Renderer::SaveBufferToImage() const
 {
 	return SDL_SaveBMP(m_pBuffer, "RayTracing_Buffer.bmp");
+}
+
+void dae::Renderer::CycleLightingMode()
+{
+	m_LightingMode = static_cast<LightingMode>((static_cast<int>(m_LightingMode) + 1) % 4);
 }

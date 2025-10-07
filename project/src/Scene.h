@@ -91,6 +91,8 @@ namespace dae
 		Sphere* m_pSphere1{};
 	};
 
+	//+++++++++++++++++++++++++++++++++++++++++
+	//WEEK 2 Test Scene
 	class Scene_W2 final : public Scene
 	{
 	public:
@@ -104,6 +106,21 @@ namespace dae
 		Scene_W2& operator=(const Scene_W2&) = delete;
 		Scene_W2& operator=(Scene_W2&&) noexcept = delete;
 
+		void Initialize() override;
+	};
+
+	//+++++++++++++++++++++++++++++++++++++++++
+	//WEEK 3 Test Scene
+	class Scene_W3_Test final : public Scene
+	{
+	public:
+		Scene_W3_Test() = default;
+		~Scene_W3_Test() override = default;
+		void Update(dae::Timer* pTimer) override;
+		Scene_W3_Test(const Scene_W3_Test&) = delete;
+		Scene_W3_Test(Scene_W3_Test&&) noexcept = delete;
+		Scene_W3_Test& operator=(const Scene_W3_Test&) = delete;
+		Scene_W3_Test& operator=(Scene_W3_Test&&) noexcept = delete;
 		void Initialize() override;
 	};
 
