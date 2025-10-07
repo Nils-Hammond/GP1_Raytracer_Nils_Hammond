@@ -1,4 +1,7 @@
 //External includes
+#include <algorithm>
+#include <execution>
+#include <numeric>
 #include "SDL.h"
 #include "SDL_surface.h"
 
@@ -31,27 +34,34 @@ void Renderer::Render(Scene* pScene) const
 	
 	const Matrix cameraToWorld = camera.CalculateCameraToWorld();
 
-	for (int px{}; px < m_Width; ++px)
-	{
-		for (int py{}; py < m_Height; ++py)
+	std::vector<int> pixelIndices(m_Width * m_Height);
+	std::iota(pixelIndices.begin(), pixelIndices.end(), 0);
+
+	std::for_each(std::execution::par, pixelIndices.begin(), pixelIndices.end(), [&](int idx)
 		{
+			int px = idx % m_Width;
+			int py = idx / m_Width;
+			//for (int px{}; px < m_Width; ++px)
+			//{
+			//	for (int py{}; py < m_Height; ++py)
+			//	{
 			float ndcx = (2 * (px + 0.5f) / m_Width - 1) * aspectRatio * fov;
 			float ndcy = (1 - 2 * (py + 0.5f) / m_Height) * fov;
 			Vector3 rayDirection = Vector3{ ndcx, ndcy, 1 }.Normalized();
 			rayDirection = cameraToWorld.TransformVector(rayDirection).Normalized();
 
-			Ray hitRay{ camera.origin, rayDirection};
+			Ray hitRay{ camera.origin, rayDirection };
 
 			ColorRGB finalColor;//{ rayDirection.x, rayDirection.y, rayDirection.z };
 
 			HitRecord closestHit{};
 
 			pScene->GetClosestHit(hitRay, closestHit);
-			
+
 			if (closestHit.didHit)
 			{
 				Vector3 lightDir = LightUtils::GetDirectionToLight(lights[0], closestHit.origin);
-				Ray shadowRay{ closestHit.origin, lightDir.Normalized(), 0.0001f, lightDir.Magnitude()};
+				Ray shadowRay{ closestHit.origin, lightDir.Normalized(), 0.0001f, lightDir.Magnitude() };
 
 				finalColor = materials[closestHit.materialIndex]->Shade();
 
@@ -59,8 +69,6 @@ void Renderer::Render(Scene* pScene) const
 				{
 					finalColor *= 0.5f;
 				}
-				//const float scaled_t = closestHit.t / 500.f;
-				//finalColor = { scaled_t, scaled_t, scaled_t };
 			}
 
 			//Update Color in Buffer
@@ -70,9 +78,9 @@ void Renderer::Render(Scene* pScene) const
 				static_cast<uint8_t>(finalColor.r * 255),
 				static_cast<uint8_t>(finalColor.g * 255),
 				static_cast<uint8_t>(finalColor.b * 255));
-		}
-	}
-
+			//	}
+			//}
+		});
 	//@END
 	//Update SDL Surface
 	SDL_UpdateWindowSurface(m_pWindow);

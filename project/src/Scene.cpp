@@ -346,20 +346,45 @@ namespace dae {
 	}
 	void Scene_W2::Update(dae::Timer* pTimer)
 	{
-		static int counter = 0;
-		++counter;
 		Scene::Update(pTimer);
-		BuildSphereBVH();
+		const float deltaTime = pTimer->GetElapsed();
+
 		for (Sphere& sphere : m_SphereGeometries)
 		{
-			sphere.origin.y += sinf(pTimer->GetTotal()) * 0.1f;
-			sphere.origin.x += cosf(pTimer->GetTotal()) * 0.1f;
+			sphere.origin.y += sinf(pTimer->GetTotal()) * deltaTime * .5f;
+			sphere.origin.x += cosf(pTimer->GetTotal()) * deltaTime * .5f;
 		}
+		BuildSphereBVH();
 		//todo W2
-		//std::cout << counter << std::endl;
-		if (counter > 2)
-		{
-			//throw std::runtime_error("That's enough frames");
-		}
 	}
+#pragma endregion
+#pragma region SCENE W3
+	void Scene_W3::Initialize()
+	{
+		m_Camera.origin = { 0.f, 3.f, -9.f };
+		m_Camera.fovAngle = 45.f;
+
+		constexpr unsigned char matId_Solid_Red = 0;
+		const unsigned char matId_Solid_Blue = AddMaterial(new Material_SolidColor{ colors::Blue });
+
+		const unsigned char matId_Solid_Yellow = AddMaterial(new Material_SolidColor{ colors::Yellow });
+		const unsigned char matId_Solid_Green = AddMaterial(new Material_SolidColor{ colors::Green });
+		const unsigned char matId_Solid_Magenta = AddMaterial(new Material_SolidColor{ colors::Magenta });
+
+		//Spheres
+		AddSphere({ -25.f, 0.f, 100.f }, 50.f, matId_Solid_Red);
+		AddSphere({ 25.f, 0.f, 100.f }, 50.f, matId_Solid_Blue);
+
+		//Plane
+		AddPlane({ 0.f, 0.f, 0.f }, { 0.f, 1.f,0.f }, matId_Solid_Green);
+		//AddPlane({ 75.f, 0.f, 0.f }, { -1.f, 0.f,0.f }, matId_Solid_Green);
+		//AddPlane({ 0.f, -75.f, 0.f }, { 0.f, 1.f,0.f }, matId_Solid_Yellow);
+		//AddPlane({ 0.f, 75.f, 0.f }, { 0.f, -1.f,0.f }, matId_Solid_Yellow);
+		//AddPlane({ 0.f, 0.f, 125.f }, { 0.f, 0.f,-1.f }, matId_Solid_Magenta);
+	}
+	void Scene_W3::Update(dae::Timer* pTimer)
+	{
+		Scene::Update(pTimer);
+	}
+#pragma endregion
 }

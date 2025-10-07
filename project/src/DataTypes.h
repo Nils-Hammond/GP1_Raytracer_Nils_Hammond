@@ -181,7 +181,7 @@ namespace dae
 	{
 		Vector3 aabbMin{};
 		Vector3 aabbMax{};
-		uint8_t leftNode, firstPrimIdx, primCount;
+		uint8_t leftNode{}, firstPrimIdx{}, primCount{};
 		bool isLeaf() const { return primCount > 0; }
 	};
 #pragma endregion

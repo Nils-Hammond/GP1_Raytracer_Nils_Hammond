@@ -149,6 +149,15 @@ namespace dae
 		{
 			//todo W3
 			throw std::runtime_error("Not Implemented Yet");
+			if (light.type == LightType::Point)
+			{
+				float distanceSqr = (light.origin - target).SqrMagnitude();
+				return light.color * (light.intensity / distanceSqr);
+			}
+			else if (light.type == LightType::Directional)
+			{
+				return light.color * light.intensity;
+			}
 			return {};
 		}
 	}
