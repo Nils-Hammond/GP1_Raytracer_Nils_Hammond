@@ -2,11 +2,20 @@
 #include <fstream>
 #include "Math.h"
 #include "DataTypes.h"
+#include <iostream>
 
 namespace dae
 {
 	namespace GeometryUtils
 	{
+		inline void UpdateHitRecord(HitRecord& hitRecord, const Vector3& origin, const Vector3& normal, const unsigned char materialIndex, float t)
+		{
+			hitRecord.didHit = true;
+			hitRecord.materialIndex = materialIndex;
+			hitRecord.t = t;
+			hitRecord.origin = origin;
+			hitRecord.normal = normal;
+		}
 #pragma region Sphere HitTest
 		//SPHERE HIT-TESTS
 		inline bool HitTest_Sphere(const Sphere& sphere, const Ray& ray, HitRecord& hitRecord, bool ignoreHitRecord = false)
@@ -28,11 +37,9 @@ namespace dae
 			{
 				if (!ignoreHitRecord)
 				{
-					hitRecord.didHit = true;
-					hitRecord.materialIndex = sphere.materialIndex;
-					hitRecord.t = t0;
-					hitRecord.origin = ray.origin + ray.direction * t0;
-					hitRecord.normal = (hitRecord.origin - sphere.origin).Normalized();
+					const Vector3 hitOrigin = ray.origin + ray.direction * t0;
+					const Vector3 hitNormal = (hitOrigin - sphere.origin).Normalized();
+					UpdateHitRecord(hitRecord, hitOrigin, hitNormal, sphere.materialIndex, t0);
 				}
 				return true;
 			}
@@ -41,17 +48,15 @@ namespace dae
 			{
 				if (!ignoreHitRecord)
 				{
-					hitRecord.didHit = true;
-					hitRecord.materialIndex = sphere.materialIndex;
-					hitRecord.t = t1;
-					hitRecord.origin = ray.origin + ray.direction * t1;
-					hitRecord.normal = (hitRecord.origin - sphere.origin).Normalized();
+					const Vector3 hitOrigin = ray.origin + ray.direction * t1;
+					const Vector3 hitNormal = (hitOrigin - sphere.origin).Normalized();
+					UpdateHitRecord(hitRecord, hitOrigin, hitNormal, sphere.materialIndex, t1);
 				}
 				return true;
 			}
 			return false;
 		}
-
+		 
 		inline bool HitTest_Sphere(const Sphere& sphere, const Ray& ray)
 		{
 			HitRecord temp{};
@@ -68,11 +73,9 @@ namespace dae
 			{
 				if (!ignoreHitRecord)
 				{
-					hitRecord.didHit = true;
-					hitRecord.t = t;
-					hitRecord.origin = ray.origin + ray.direction * t;
-					hitRecord.normal = plane.normal;
-					hitRecord.materialIndex = plane.materialIndex;
+					const Vector3 hitOrigin = ray.origin + ray.direction * t;
+					const Vector3 hitNormal = plane.normal;
+					UpdateHitRecord(hitRecord, hitOrigin, hitNormal, plane.materialIndex, t);
 				}
 				return true;
 			}
@@ -89,8 +92,34 @@ namespace dae
 		//TRIANGLE HIT-TESTS
 		inline bool HitTest_Triangle(const Triangle& triangle, const Ray& ray, HitRecord& hitRecord, bool ignoreHitRecord = false)
 		{
-			//todo W5
-			throw std::runtime_error("Not Implemented Yet");
+			float t = Vector3::Dot(triangle.v0 - ray.origin, triangle.normal) / Vector3::Dot(ray.direction, triangle.normal);
+			if (t > ray.min && t < ray.max)
+			{
+				const Vector3 P = ray.origin + ray.direction * t;
+				const Vector3 edgeV0V1 = triangle.v1 - triangle.v0;
+				const Vector3 edgeV1V2 = triangle.v2 - triangle.v1;
+				const Vector3 edgeV2V0 = triangle.v0 - triangle.v2;
+				const Vector3 C0 = P - triangle.v0;
+				const Vector3 C1 = P - triangle.v1;
+				const Vector3 C2 = P - triangle.v2;
+
+				float side = Vector3::Dot(ignoreHitRecord ? triangle.normal : -triangle.normal, ray.direction);
+
+				if ((triangle.cullMode == TriangleCullMode::BackFaceCulling && side < 0) 
+					|| (triangle.cullMode == TriangleCullMode::FrontFaceCulling && side > 0))
+					return false;
+				if (Vector3::Dot(triangle.normal, Vector3::Cross(edgeV0V1, C0)) >= 0 &&
+					Vector3::Dot(triangle.normal, Vector3::Cross(edgeV1V2, C1)) >= 0 &&
+					Vector3::Dot(triangle.normal, Vector3::Cross(edgeV2V0, C2)) >= 0)
+				{
+					if (!ignoreHitRecord)
+					{
+						const Vector3 hitOrigin = ray.origin + ray.direction * t;
+						UpdateHitRecord(hitRecord, hitOrigin, side < 0 ? -triangle.normal : triangle.normal, triangle.materialIndex, t);
+					}
+					return true;
+				}
+			}
 			return false;
 		}
 
@@ -103,9 +132,35 @@ namespace dae
 #pragma region TriangeMesh HitTest
 		inline bool HitTest_TriangleMesh(const TriangleMesh& mesh, const Ray& ray, HitRecord& hitRecord, bool ignoreHitRecord = false)
 		{
-			//todo W5
-			throw std::runtime_error("Not Implemented Yet");
-			return false;
+			if (mesh.indices.size() < 3) return false;
+
+			std::vector<Triangle> triangles;
+			triangles.reserve(mesh.indices.size() / 3);
+			for (size_t i = 0; i < mesh.indices.size(); i += 3)
+			{
+				triangles.emplace_back(mesh.transformedPositions[mesh.indices[i]], mesh.transformedPositions[mesh.indices[i + 1]], mesh.transformedPositions[mesh.indices[i + 2]], mesh.transformedNormals[i / 3]);
+				triangles.back().cullMode = mesh.cullMode;
+				triangles.back().materialIndex = mesh.materialIndex;
+			}
+			HitRecord tempHit{};
+			float closestT = FLT_MAX;
+			bool hit = false;
+
+			for (const Triangle& triangle : triangles)
+			{
+				if (HitTest_Triangle(triangle, ray, tempHit, ignoreHitRecord))
+				{
+					if (ignoreHitRecord)
+						return true;
+					if (tempHit.t < closestT)
+					{
+						closestT = tempHit.t;
+						hit = true;
+						hitRecord = tempHit;
+					}
+				}
+			}
+			return hit;
 		}
 
 		inline bool HitTest_TriangleMesh(const TriangleMesh& mesh, const Ray& ray)

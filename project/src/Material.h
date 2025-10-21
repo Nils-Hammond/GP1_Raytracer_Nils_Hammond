@@ -95,32 +95,32 @@ namespace dae
 	class Material_CookTorrence final : public Material
 	{
 	public:
-		Material_CookTorrence(const ColorRGB& albedo, float metalness, float roughness) :
+		Material_CookTorrence(const ColorRGB& albedo, bool metalness, float roughness) :
 			m_Albedo(albedo), m_Metalness(metalness), m_Roughness(roughness) {}
 
 		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
 		{
 			//F0
-			ColorRGB f0 = { 0.04f, 0.04f, 0.04f }; //Dielectric
-			f0 = ColorRGB::Lerp(f0, m_Albedo, m_Metalness);
+			ColorRGB f0 = (m_Metalness) ? m_Albedo : ColorRGB{ 0.04f, 0.04f, 0.04f };
 
 			//Half Vector
 			const Vector3 h = (l + v).Normalized();
 
-			//BRDF Components
-			ColorRGB F = BRDF::FresnelFunction_Schlick(h, v, f0);
+			//BRDF
 			float D = BRDF::NormalDistribution_GGX(hitRecord.normal, h, m_Roughness);
+			ColorRGB F = BRDF::FresnelFunction_Schlick(h, v, f0);
 			float G = BRDF::GeometryFunction_Smith(hitRecord.normal, v, l, m_Roughness);
 
-			ColorRGB specular = (F * D * G) / (4 * std::max(0.f, Vector3::Dot(v, hitRecord.normal)) * std::max(0.f, Vector3::Dot(l, hitRecord.normal)) + 0.001f);
-			ColorRGB kd = (colors::White - F) * (1 - m_Metalness);
+			ColorRGB specular = (D * F * G) / std::max(0.0001f, 4 * (Vector3::Dot(v, hitRecord.normal) * Vector3::Dot(l, hitRecord.normal)));
+			ColorRGB kd = (m_Metalness) ? colors::Black : (colors::White - F);
 			ColorRGB diffuse = kd * BRDF::Lambert(1.f, m_Albedo);
+
 			return diffuse + specular;
 		}
 
 	private:
 		ColorRGB m_Albedo{ 0.955f, 0.637f, 0.538f }; //Copper
-		float m_Metalness{ 1.0f };
+		bool m_Metalness{ true };
 		float m_Roughness{ 0.1f }; // [1.0 > 0.0] >> [ROUGH > SMOOTH]
 	};
 #pragma endregion

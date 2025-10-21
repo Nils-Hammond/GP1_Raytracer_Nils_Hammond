@@ -75,12 +75,12 @@ void Renderer::Render(Scene* pScene) const
 
 					//Observed Area Measure
 					float lambert = Vector3::Dot(closestHit.normal, lightDir.Normalized());
-					if (lambert < 0) continue;
+					if (lambert <= 0) continue;
 
 					//Radiance
 					ColorRGB radiance = LightUtils::GetRadiance(light, closestHit.origin);
 
-					//BRDF
+					//BRDF 
 					ColorRGB brdf = materials[closestHit.materialIndex]->Shade(closestHit, -hitRay.direction, lightDir.Normalized());
 
 					if (m_LightingMode == LightingMode::Combined)

@@ -32,7 +32,7 @@ namespace dae
 		 */
 		static ColorRGB Phong(float ks, float exp, const Vector3& l, const Vector3& v, const Vector3& n)
 		{
-			float specularReflection = ks * powf(std::max(0.f, Vector3::Dot(Vector3::Reflect(-l, n), v)), exp);
+			float specularReflection = ks * powf(std::abs(Vector3::Dot(Vector3::Reflect(-l, n), v)), exp);
 			ColorRGB result = { specularReflection, specularReflection, specularReflection };
 			return result;
 		}
@@ -46,7 +46,7 @@ namespace dae
 		 */
 		static ColorRGB FresnelFunction_Schlick(const Vector3& h, const Vector3& v, const ColorRGB& f0)
 		{
-			ColorRGB result = f0 + (colors::White - f0) * powf(1 - std::max(0.f, Vector3::Dot(h, v)), 5);
+			ColorRGB result = f0 + (colors::White - f0) * powf(1 - std::max(0.f, Vector3::Dot(v, h)), 5);
 			return result;
 		}
 
@@ -60,7 +60,8 @@ namespace dae
 		static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, float roughness)
 		{
 			float a = roughness * roughness;
-			float result = powf(a, 2) / (float(M_PI) * powf(powf(Vector3::Dot(n, h), 2) * (a - 1) + 1, 2));
+			float a2 = a * a;
+			float result = a2 / (float(M_PI) * powf(powf(std::max(0.f, Vector3::Dot(n, h)), 2) * (a2 - 1) + 1, 2));
 			return result;
 		}
 
@@ -74,7 +75,8 @@ namespace dae
 		 */
 		static float GeometryFunction_SchlickGGX(const Vector3& n, const Vector3& v, float roughness)
 		{
-			float k = (roughness + 1) * (roughness + 1) / 8;
+			float a = roughness * roughness;
+			float k = powf((a + 1), 2) / 8;
 			float result = Vector3::Dot(n, v) / (Vector3::Dot(n, v) * (1 - k) + k);
 			return result;
 		}
